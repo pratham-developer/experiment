@@ -24,8 +24,6 @@ data class User(
 
     val address: String? = null,
 
-    val active: Boolean = true,
-
     @CreatedDate
     val createdAt: Instant? = null,
 
