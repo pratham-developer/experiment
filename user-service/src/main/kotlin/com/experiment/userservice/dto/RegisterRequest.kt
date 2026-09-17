@@ -1,11 +1,10 @@
 package com.experiment.userservice.dto
 
-import com.experiment.userservice.entity.Role
-
-data class CreateUserRequest(
+data class RegisterRequest(
     val name: String,
     val email: String,
-    val role: Role = Role.CUSTOMER,
+    val password: String,
+    val role: String,
     val phone: String? = null,
     val address: String? = null
 )
