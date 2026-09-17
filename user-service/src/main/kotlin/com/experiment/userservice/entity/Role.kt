@@ -6,8 +6,10 @@ enum class Role {
 
     companion object {
         fun from(value: String): Role =
-            entries.firstOrNull {
-                it.name.equals(value.trim(), ignoreCase = true)
-            } ?: throw IllegalArgumentException("Invalid role: $value")
+            try {
+                valueOf(value.trim().uppercase())
+            } catch (_: IllegalArgumentException) {
+                throw IllegalArgumentException("Invalid role: $value")
+            }
     }
 }
