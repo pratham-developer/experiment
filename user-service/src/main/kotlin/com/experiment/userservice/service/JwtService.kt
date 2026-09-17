@@ -27,8 +27,11 @@ class JwtService(
     fun generateAccessToken(user: User): String {
         val now = Instant.now()
 
+        val userId = user.id
+            ?: throw IllegalStateException("Cannot generate JWT for unsaved user")
+
         return Jwts.builder()
-            .subject(user.id!!)
+            .subject(userId)
             .claim("email", user.email)
             .claim("role", user.role.name)
             .issuedAt(Date.from(now))
