@@ -6,16 +6,16 @@ import io.jsonwebtoken.security.Keys
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import java.time.Instant
-import javax.crypto.SecretKey
 import java.util.Date
+import javax.crypto.SecretKey
 
 @Service
 class JwtService(
 
-    @Value($$"${jwt.access-token-expiration}")
+    @Value("\${jwt.access-token-expiration}")
     private val accessTokenExpiration: Long,
 
-    @Value($$"${jwt.access-token-secret}")
+    @Value("\${jwt.access-token-secret}")
     private val accessSecret: String
 
 ) {
@@ -25,10 +25,11 @@ class JwtService(
     }
 
     fun generateAccessToken(user: User): String {
-        val now = Instant.now()
 
         val userId = user.id
             ?: throw IllegalStateException("Cannot generate JWT for unsaved user")
+
+        val now = Instant.now()
 
         return Jwts.builder()
             .subject(userId)

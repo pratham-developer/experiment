@@ -5,9 +5,9 @@ import com.experiment.userservice.dto.LoginResponse
 import com.experiment.userservice.dto.RegisterRequest
 import com.experiment.userservice.entity.Role
 import com.experiment.userservice.entity.User
+import com.experiment.userservice.exception.EmailAlreadyExistsException
+import com.experiment.userservice.exception.InvalidCredentialsException
 import com.experiment.userservice.repository.UserRepository
-import org.springframework.security.authentication.AuthenticationManager
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 
@@ -15,12 +15,13 @@ import org.springframework.stereotype.Service
 class AuthService(
     private val userRepository: UserRepository,
     private val passwordEncoder: PasswordEncoder,
-    private val authenticationManager: AuthenticationManager,
     private val jwtService: JwtService
 ) {
-    fun registerUser(request: RegisterRequest){
-        if(userRepository.existsByEmail(request.email)){
-            throw IllegalArgumentException("User email already exists")
+
+    fun registerUser(request: RegisterRequest) {
+
+        if (userRepository.existsByEmail(request.email)) {
+            throw EmailAlreadyExistsException()
         }
 
         val user = User(
@@ -37,18 +38,24 @@ class AuthService(
     }
 
     fun loginUser(request: LoginRequest): LoginResponse {
-        val authentication = authenticationManager.authenticate(
-            UsernamePasswordAuthenticationToken(
-                request.email,
-                request.password
-            )
-        )
 
-        val user = authentication.principal as User
+        val user = userRepository.findByEmail(request.email)
+            ?: throw InvalidCredentialsException()
+
+        if (!passwordEncoder.matches(
+                request.password,
+                user.passwordHash
+            )
+        ) {
+            throw InvalidCredentialsException()
+        }
+
+        val userId = user.id
+            ?: throw IllegalStateException("User ID is missing")
 
         return LoginResponse(
             accessToken = jwtService.generateAccessToken(user),
-            userId = user.id!!,
+            userId = userId,
             email = user.email,
             role = user.role.name
         )
