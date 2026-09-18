@@ -28,7 +28,7 @@ public class Order {
     private String address;
 
     @Builder.Default
-    @Column(nullable = false)
+    @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal totalAmount = BigDecimal.ZERO;
 
     @OneToMany(

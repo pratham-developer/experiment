@@ -27,7 +27,7 @@ public class OrderItem {
     private Long itemId;
 
     @Builder.Default
-    @Column(nullable = false)
+    @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal price = BigDecimal.ZERO;
 
     @Column(name = "seller_id", nullable = false)

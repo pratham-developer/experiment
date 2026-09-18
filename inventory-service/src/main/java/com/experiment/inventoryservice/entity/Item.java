@@ -27,7 +27,7 @@ public class Item {
     private String description;
 
     @Builder.Default
-    @Column(nullable = false)
+    @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal mrp = BigDecimal.ZERO;
 
     @Builder.Default

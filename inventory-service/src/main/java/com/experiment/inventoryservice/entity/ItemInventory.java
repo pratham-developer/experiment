@@ -39,6 +39,6 @@ public class ItemInventory {
     private Long unitsAvailable = 0L;
 
     @Builder.Default
-    @Column(nullable = false)
+    @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal sellingPrice = BigDecimal.ZERO;
 }
