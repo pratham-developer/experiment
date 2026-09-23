@@ -1,4 +1,4 @@
-package com.experiment.inventoryservice.repostiory;
+package com.experiment.inventoryservice.repository;
 
 import com.experiment.inventoryservice.entity.Item;
 import org.springframework.data.jpa.repository.JpaRepository;

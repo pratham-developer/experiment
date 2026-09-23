@@ -26,6 +26,9 @@ public class OrderItem {
     @Column(name = "item_id", nullable = false)
     private Long itemId;
 
+    @Column(name = "inventory_id", nullable = false)
+    private Long inventoryId;
+
     @Builder.Default
     @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal price = BigDecimal.ZERO;

@@ -1,8 +1,8 @@
 package com.experiment.inventoryservice.service;
 
-import com.experiment.inventoryservice.dto.seller.AddItemRequest;
+import com.experiment.inventoryservice.dto.AddItemRequest;
 import com.experiment.inventoryservice.entity.Item;
-import com.experiment.inventoryservice.repostiory.ItemRepository;
+import com.experiment.inventoryservice.repository.ItemRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

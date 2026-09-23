@@ -1,6 +1,6 @@
 package com.experiment.inventoryservice.controller;
 
-import com.experiment.inventoryservice.dto.seller.AddItemInventoryRequest;
+import com.experiment.inventoryservice.dto.AddItemInventoryRequest;
 import com.experiment.inventoryservice.service.ItemInventoryService;
 import com.experiment.microservicesecuritystarter.annotation.RequiresRole;
 import com.experiment.microservicesecuritystarter.security.SecurityRole;

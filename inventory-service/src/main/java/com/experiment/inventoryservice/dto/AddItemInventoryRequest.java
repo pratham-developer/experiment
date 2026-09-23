@@ -1,4 +1,4 @@
-package com.experiment.inventoryservice.dto.seller;
+package com.experiment.inventoryservice.dto;
 
 import java.math.BigDecimal;
 
