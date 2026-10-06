@@ -9,8 +9,7 @@ public class PublicRoutes {
 
     private static final Set<String> PUBLIC_ROUTES = Set.of(
             "/api/users/auth/login",
-            "/api/users/auth/register",
-            "/api/items/reserve"
+            "/api/users/auth/register"
     );
 
     public boolean isPublic(String path) {

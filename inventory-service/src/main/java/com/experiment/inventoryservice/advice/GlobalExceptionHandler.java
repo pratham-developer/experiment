@@ -2,6 +2,7 @@ package com.experiment.inventoryservice.advice;
 
 import com.experiment.microservicesecuritystarter.exception.SecurityForbiddenException;
 import com.experiment.microservicesecuritystarter.exception.SecurityUnauthorizedException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -37,6 +38,20 @@ public class GlobalExceptionHandler {
                         HttpStatus.FORBIDDEN.value(),
                         HttpStatus.FORBIDDEN.getReasonPhrase(),
                         ex.getMessage()
+                ));
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(
+            DataIntegrityViolationException ex
+    ) {
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(new ErrorResponse(
+                        Instant.now(),
+                        HttpStatus.CONFLICT.value(),
+                        HttpStatus.CONFLICT.getReasonPhrase(),
+                        "Inventory already exists for this item and seller"
                 ));
     }
 

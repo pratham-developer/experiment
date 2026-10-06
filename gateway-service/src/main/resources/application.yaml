@@ -8,8 +8,7 @@ spring:
         webflux:
           discovery:
             locator:
-              enabled: true
-              lower-case-service-id: true
+              enabled: false
 
           routes:
             - id: user-service
@@ -31,7 +30,7 @@ spring:
               predicates:
                 - Path=/api/items/**
               filters:
-                - StripPrefix=2
+                - StripPrefix=1
 
 server:
   port: 8080
