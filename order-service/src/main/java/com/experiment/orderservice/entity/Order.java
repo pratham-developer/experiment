@@ -2,6 +2,8 @@ package com.experiment.orderservice.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -40,16 +42,11 @@ public class Order {
     @Builder.Default
     private List<OrderItem> orderItems = new ArrayList<>();
 
-    @Column(
-            nullable = false,
-            updatable = false,
-            columnDefinition = "TIMESTAMP WITH TIME ZONE"
-    )
+    @CreatedDate
+    @Column(nullable = false, updatable = false)
     private Instant createdAt;
 
-    @Column(
-            nullable = false,
-            columnDefinition = "TIMESTAMP WITH TIME ZONE"
-    )
+    @LastModifiedDate
+    @Column(nullable = false)
     private Instant updatedAt;
 }

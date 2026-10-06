@@ -1,6 +1,7 @@
 package com.experiment.inventoryservice.controller;
 
 import com.experiment.inventoryservice.dto.ReserveInventoryRequest;
+import com.experiment.inventoryservice.dto.ReserveInventoryResponse;
 import com.experiment.inventoryservice.service.ItemInventoryService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -16,9 +17,9 @@ public class InternalInventoryController {
 
     @PostMapping("/reserve")
     @ResponseStatus(HttpStatus.CREATED)
-    public void reserveInventory(
+    public ReserveInventoryResponse reserveInventory(
             @Valid @RequestBody ReserveInventoryRequest request
     ) {
-        itemInventoryService.reserveInventory(request);
+        return itemInventoryService.reserveInventory(request);
     }
 }

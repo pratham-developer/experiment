@@ -1,8 +1,6 @@
 package com.experiment.inventoryservice.service;
 
-import com.experiment.inventoryservice.dto.AddItemInventoryRequest;
-import com.experiment.inventoryservice.dto.InventoryUnitsDto;
-import com.experiment.inventoryservice.dto.ReserveInventoryRequest;
+import com.experiment.inventoryservice.dto.*;
 import com.experiment.inventoryservice.entity.*;
 import com.experiment.inventoryservice.messaging.event.ReleaseInventoryEvent;
 import com.experiment.inventoryservice.repository.ItemInventoryRepository;
@@ -76,10 +74,13 @@ public class ItemInventoryService {
     }
 
     @Transactional
-    public void reserveInventory(ReserveInventoryRequest request) {
+    public ReserveInventoryResponse reserveInventory(
+            ReserveInventoryRequest request
+    ) {
         if (request.sagaId() == null) {
             throw new IllegalArgumentException("sagaId is required");
         }
+
         if (request.inventories() == null ||
                 request.inventories().isEmpty()) {
             throw new IllegalArgumentException(
@@ -92,11 +93,20 @@ public class ItemInventoryService {
         // Idempotency check
         Optional<OrderSaga> existing =
                 orderSagaRepository.findById(sagaId);
+
         if (existing.isPresent()) {
-            if (existing.get().getSagaStatus()
+
+            OrderSaga saga = existing.get();
+
+            if (saga.getSagaStatus()
                     == OrderSagaStatus.INVENTORY_RESERVED) {
-                return;
+
+                return new ReserveInventoryResponse(
+                        sagaId,
+                        saga.getReservationDetails()
+                );
             }
+
             throw new IllegalStateException(
                     "Saga " + sagaId + " has already been released"
             );
@@ -121,7 +131,7 @@ public class ItemInventoryService {
                 .sorted()
                 .toList();
 
-        // Acquire all locks in deterministic order
+        // Acquire locks in deterministic order
         List<ItemInventory> inventories =
                 itemInventoryRepository.findAllByIdForUpdate(
                         inventoryIds
@@ -135,13 +145,16 @@ public class ItemInventoryService {
 
         // Validate everything before mutation
         for (ItemInventory inventory : inventories) {
+
             Long required =
                     capacityMap.get(inventory.getId());
+
             if (required == null || required <= 0) {
                 throw new IllegalArgumentException(
                         "Units required must be positive"
                 );
             }
+
             if (inventory.getUnitsAvailable() < required) {
                 throw new IllegalArgumentException(
                         "Insufficient inventory"
@@ -149,10 +162,26 @@ public class ItemInventoryService {
             }
         }
 
-        // Mutate managed entities
+        // Create reservation snapshot
+        List<ReservedInventoryDto> reservedInventories =
+                inventories.stream()
+                        .map(inventory ->
+                                new ReservedInventoryDto(
+                                        inventory.getId(),
+                                        inventory.getItem().getId(),
+                                        capacityMap.get(inventory.getId()),
+                                        inventory.getSellingPrice(),
+                                        inventory.getSellerId()
+                                )
+                        )
+                        .toList();
+
+        // Decrement inventory
         for (ItemInventory inventory : inventories) {
+
             Long required =
                     capacityMap.get(inventory.getId());
+
             inventory.setUnitsAvailable(
                     inventory.getUnitsAvailable() - required
             );
@@ -165,7 +194,16 @@ public class ItemInventoryService {
                         .sagaStatus(
                                 OrderSagaStatus.INVENTORY_RESERVED
                         )
+                        .reservationDetails(
+                                reservedInventories
+                        )
                         .build()
+        );
+
+        // Return reservation details to Order Service
+        return new ReserveInventoryResponse(
+                sagaId,
+                reservedInventories
         );
     }
 
