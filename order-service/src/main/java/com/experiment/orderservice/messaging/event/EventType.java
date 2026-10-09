@@ -1,5 +1,6 @@
 package com.experiment.orderservice.messaging.event;
 
 public enum EventType {
-    RELEASE_INVENTORY
+    RELEASE_INVENTORY,
+    ORDER_COMPLETED
 }

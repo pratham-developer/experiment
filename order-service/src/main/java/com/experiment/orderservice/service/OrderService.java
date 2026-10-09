@@ -12,24 +12,22 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class OrderService {
+
     private final InventoryReservationService inventoryReservationService;
     private final OrderCreationService orderCreationService;
     private final CompensationOutboxService compensationOutboxService;
 
     public void placeOrder(PlaceOrderRequest request) {
-
         UUID sagaId = UUID.randomUUID();
 
         ReserveInventoryRequest reserveRequest =
                 new ReserveInventoryRequest(
                         sagaId,
                         request.items().stream()
-                                .map(item->
-                                        new InventoryUnitsDto(
-                                                item.inventoryId(),
-                                                item.unitsRequired()
-                                        )
-                                )
+                                .map(item -> new InventoryUnitsDto(
+                                        item.inventoryId(),
+                                        item.unitsRequired()
+                                ))
                                 .toList()
                 );
 
@@ -37,7 +35,9 @@ public class OrderService {
                 inventoryReservationService.reserve(reserveRequest);
 
         try {
-            orderCreationService.createOrder(request, reserveResponse);
+            orderCreationService.createOrderAndEvent(
+                    sagaId, request, reserveResponse
+            );
         } catch (Exception e) {
             compensationOutboxService.createInventoryReleaseEvent(
                     sagaId,
