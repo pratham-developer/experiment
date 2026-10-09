@@ -35,4 +35,7 @@ public class OrderItem {
 
     @Column(name = "seller_id", nullable = false)
     private String sellerId;
+
+    @Column(name = "units_ordered", nullable = false)
+    private Long unitsOrdered;
 }
