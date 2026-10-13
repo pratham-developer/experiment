@@ -18,6 +18,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -79,7 +80,13 @@ public class OrderCreationService {
         OutboxEvent outboxEvent = OutboxEvent.builder()
                 .eventId(eventId)
                 .eventType(EventType.ORDER_COMPLETED)
-                .payload(objectMapper.valueToTree(event))
+                .payload(
+                        objectMapper.convertValue(
+                                event,
+                                new tools.jackson.core.type.TypeReference<Map<String, Object>>() {}
+                        )
+                )
+
                 .build();
 
         outboxEventRepository.save(outboxEvent);

@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -46,7 +47,12 @@ public class CompensationOutboxService {
         OutboxEvent outboxEvent = OutboxEvent.builder()
                 .eventId(eventId)
                 .eventType(EventType.RELEASE_INVENTORY)
-                .payload(objectMapper.valueToTree(event))
+                .payload(
+                        objectMapper.convertValue(
+                                event,
+                                new tools.jackson.core.type.TypeReference<Map<String, Object>>() {}
+                        )
+                )
                 .build();
 
         outboxEventRepository.save(outboxEvent);
