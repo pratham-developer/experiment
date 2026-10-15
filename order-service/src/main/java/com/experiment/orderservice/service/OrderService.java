@@ -40,8 +40,7 @@ public class OrderService {
             );
         } catch (Exception e) {
             compensationOutboxService.createInventoryReleaseEvent(
-                    sagaId,
-                    reserveResponse
+                    sagaId
             );
             throw e;
         }

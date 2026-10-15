@@ -1,7 +1,5 @@
 package com.experiment.orderservice.service;
 
-import com.experiment.orderservice.dto.InventoryUnitsDto;
-import com.experiment.orderservice.dto.ReserveInventoryResponse;
 import com.experiment.orderservice.entity.OutboxEvent;
 import com.experiment.orderservice.messaging.event.EventType;
 import com.experiment.orderservice.messaging.event.ReleaseInventoryEvent;
@@ -23,8 +21,7 @@ public class CompensationOutboxService {
 
     @Transactional
     public void createInventoryReleaseEvent(
-            UUID sagaId,
-            ReserveInventoryResponse reservation
+            UUID sagaId
     ){
 
         UUID eventId = UUID.randomUUID();
@@ -32,16 +29,7 @@ public class CompensationOutboxService {
         ReleaseInventoryEvent event =
                 new ReleaseInventoryEvent(
                         eventId,
-                        sagaId,
-                        reservation.inventories()
-                                .stream()
-                                .map(inventory ->
-                                        new InventoryUnitsDto(
-                                                inventory.inventoryId(),
-                                                inventory.unitsReserved()
-                                        )
-                                )
-                                .toList()
+                        sagaId
                 );
 
         OutboxEvent outboxEvent = OutboxEvent.builder()

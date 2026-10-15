@@ -2,6 +2,7 @@ package com.experiment.inventoryservice.service;
 
 import com.experiment.inventoryservice.dto.*;
 import com.experiment.inventoryservice.entity.*;
+import com.experiment.inventoryservice.messaging.event.OrderCompletedEvent;
 import com.experiment.inventoryservice.messaging.event.ReleaseInventoryEvent;
 import com.experiment.inventoryservice.repository.ItemInventoryRepository;
 import com.experiment.inventoryservice.repository.ItemRepository;
@@ -98,8 +99,8 @@ public class ItemInventoryService {
 
             OrderSaga saga = existing.get();
 
-            if (saga.getSagaStatus()
-                    == OrderSagaStatus.INVENTORY_RESERVED) {
+            if (saga.getSagaStatus() == OrderSagaStatus.INVENTORY_RESERVED
+                    || saga.getSagaStatus() == OrderSagaStatus.ORDER_COMPLETED) {
 
                 return new ReserveInventoryResponse(
                         sagaId,
@@ -107,8 +108,14 @@ public class ItemInventoryService {
                 );
             }
 
+            if (saga.getSagaStatus() == OrderSagaStatus.INVENTORY_RELEASED) {
+                throw new IllegalStateException(
+                        "Cannot reserve inventory for released saga: " + sagaId
+                );
+            }
+
             throw new IllegalStateException(
-                    "Saga " + sagaId + " has already been released"
+                    "Unexpected saga state: " + saga.getSagaStatus()
             );
         }
 
@@ -209,112 +216,165 @@ public class ItemInventoryService {
 
     @Transactional
     public void releaseInventory(ReleaseInventoryEvent event) {
-        if(event.eventId() == null) {
+        if (event == null || event.eventId() == null) {
             throw new IllegalArgumentException("eventId is required");
         }
+
         if (event.sagaId() == null) {
             throw new IllegalArgumentException("sagaId is required");
-        }
-        if (event.inventories() == null ||
-                event.inventories().isEmpty()) {
-            throw new IllegalArgumentException(
-                    "At least one inventory item is required"
-            );
         }
 
         UUID eventId = event.eventId();
         UUID sagaId = event.sagaId();
 
-        // Idempotency Check with eventId
-        if(processedEventRepository.existsByEventId(eventId)){
+        // Lock the saga before checking processed events.
+        OrderSaga saga = orderSagaRepository.findBySagaIdForUpdate(sagaId)
+                .orElseThrow(() ->
+                        new IllegalStateException("Saga not found: " + sagaId));
+
+        // A duplicate event must not repeat the transition or restore stock.
+        if (processedEventRepository.existsByEventId(eventId)) {
             return;
         }
 
-        // Find Saga
-        OrderSaga orderSaga = orderSagaRepository.findBySagaId(sagaId)
-                .orElseThrow(
-                        ()->new IllegalStateException(
-                                "Saga not found: " + sagaId
-                        )
-                );
-        OrderSagaStatus currentSagaStatus = orderSaga.getSagaStatus();
+        OrderSagaStatus status = saga.getSagaStatus();
 
-        // If already released, save processed event and return early
-        if(currentSagaStatus==OrderSagaStatus.INVENTORY_RELEASED){
+        // A separately delivered release event must not restore stock again.
+        if (status == OrderSagaStatus.INVENTORY_RELEASED) {
             processedEventRepository.save(
                     ProcessedEvent.builder()
-                            .eventId(eventId).build()
+                            .eventId(eventId)
+                            .build()
             );
             return;
         }
 
-        // If not reserved throw exception
-        if(currentSagaStatus!=OrderSagaStatus.INVENTORY_RESERVED){
+        if (status != OrderSagaStatus.INVENTORY_RESERVED) {
             throw new IllegalStateException(
-                    "Invalid Saga state: " + currentSagaStatus
+                    "Cannot release inventory from saga state: " + status
             );
         }
 
-        // Build quantity map
-        Map<Long,Long> quantityMap = event.inventories().stream()
-                .collect(
-                        Collectors.toMap(
-                                InventoryUnitsDto::inventoryId,
-                                InventoryUnitsDto::unitsRequired,
-                                (a,b) -> {
-                                    throw new IllegalArgumentException(
-                                            "Duplicate inventoryId"
-                                    );
-                                }
-                        )
-                );
+        List<ReservedInventoryDto> reservation =
+                saga.getReservationDetails();
 
-        // Sort Ids ASC
+        if (reservation == null || reservation.isEmpty()) {
+            throw new IllegalStateException(
+                    "Reservation snapshot is missing for saga: " + sagaId
+            );
+        }
+
+        // Validate the persisted reservation snapshot before building the map.
+        for (ReservedInventoryDto item : reservation) {
+            if (item == null
+                    || item.inventoryId() == null
+                    || item.unitsReserved() == null
+                    || item.unitsReserved() <= 0) {
+                throw new IllegalStateException(
+                        "Invalid reservation snapshot for saga: " + sagaId
+                );
+            }
+        }
+
+        // Use the persisted reservation as the source of truth.
+        // Duplicate inventory IDs indicate corrupted reservation data.
+        Map<Long, Long> quantityMap = reservation.stream()
+                .collect(Collectors.toMap(
+                        ReservedInventoryDto::inventoryId,
+                        ReservedInventoryDto::unitsReserved,
+                        (a, b) -> {
+                            throw new IllegalStateException(
+                                    "Duplicate inventory in reservation snapshot"
+                            );
+                        }
+                ));
+
         List<Long> inventoryIds = quantityMap.keySet()
                 .stream()
                 .sorted()
                 .toList();
 
-        // Acquire Locks in Deterministic Order
-        List<ItemInventory> itemInventories = itemInventoryRepository
-                .findAllByIdForUpdate(inventoryIds);
+        List<ItemInventory> inventories =
+                itemInventoryRepository.findAllByIdForUpdate(inventoryIds);
 
-        if (itemInventories.size() != quantityMap.size()) {
-            throw new IllegalArgumentException(
-                    "Inventory not found"
+        if (inventories.size() != quantityMap.size()) {
+            throw new IllegalStateException(
+                    "Reserved inventory record is missing for saga: " + sagaId
             );
         }
 
-        // Validate Quantities
-        for (ItemInventory inventory : itemInventories) {
-            Long quantity =
-                    quantityMap.get(inventory.getId());
-
-            if (quantity == null || quantity <= 0) {
-                throw new IllegalArgumentException(
-                        "Release quantity must be positive"
-                );
-            }
-        }
-
-        // Restore Inventory
-        for (ItemInventory inventory : itemInventories) {
-            Long quantity =
-                    quantityMap.get(inventory.getId());
+        // Restore exactly the quantities that were originally reserved.
+        for (ItemInventory inventory : inventories) {
+            Long quantity = quantityMap.get(inventory.getId());
 
             inventory.setUnitsAvailable(
                     inventory.getUnitsAvailable() + quantity
             );
         }
 
-        // Update Saga Status
-        orderSaga.setSagaStatus(OrderSagaStatus.INVENTORY_RELEASED);
-        orderSagaRepository.save(orderSaga);
+        saga.setSagaStatus(OrderSagaStatus.INVENTORY_RELEASED);
+        orderSagaRepository.save(saga);
 
-        // Save processed event
+        // Both the stock restoration and event record commit together.
         processedEventRepository.save(
                 ProcessedEvent.builder()
-                        .eventId(eventId).build()
+                        .eventId(eventId)
+                        .build()
+        );
+    }
+
+    @Transactional
+    public void completeOrder(OrderCompletedEvent event) {
+        if (event == null || event.eventId() == null) {
+            throw new IllegalArgumentException("eventId is required");
+        }
+
+        if (event.sagaId() == null) {
+            throw new IllegalArgumentException("sagaId is required");
+        }
+
+        // Serialize completion and release operations for this saga.
+        OrderSaga saga = orderSagaRepository.findBySagaIdForUpdate(
+                        event.sagaId()
+                )
+                .orElseThrow(() ->
+                        new IllegalStateException(
+                                "Saga not found: " + event.sagaId()
+                        ));
+
+        // Duplicate delivery: no state change is needed.
+        if (processedEventRepository.existsByEventId(event.eventId())) {
+            return;
+        }
+
+        OrderSagaStatus status = saga.getSagaStatus();
+
+        if (status == OrderSagaStatus.INVENTORY_RELEASED) {
+            throw new IllegalStateException(
+                    "Cannot complete released saga: " + event.sagaId()
+            );
+        }
+
+        if (status == OrderSagaStatus.ORDER_COMPLETED) {
+            throw new IllegalStateException(
+                    "Saga is already completed with an unprocessed completion event: "
+                            + event.sagaId()
+            );
+        }
+
+        if (status != OrderSagaStatus.INVENTORY_RESERVED) {
+            throw new IllegalStateException(
+                    "Invalid saga state: " + status
+            );
+        }
+
+        saga.setSagaStatus(OrderSagaStatus.ORDER_COMPLETED);
+        orderSagaRepository.save(saga);
+
+        processedEventRepository.save(
+                ProcessedEvent.builder()
+                        .eventId(event.eventId())
+                        .build()
         );
     }
 }
