@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -23,4 +24,14 @@ public interface OrderSagaRepository extends JpaRepository<OrderSaga, UUID> {
     Optional<OrderSaga> findBySagaIdForUpdate(
             @Param("sagaId") UUID sagaId
     );
+
+    @Query(value = """
+    SELECT *
+    FROM order_saga
+    WHERE saga_status = 'INVENTORY_RESERVED'
+      AND created_at <= CURRENT_TIMESTAMP - (INTERVAL '1 hour' * :hours)
+    ORDER BY created_at ASC
+    LIMIT 100
+    """, nativeQuery = true)
+    List<OrderSaga> findTop100StaleReservationsByHours(@Param("hours") int hours);
 }

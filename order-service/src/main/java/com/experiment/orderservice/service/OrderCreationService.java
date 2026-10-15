@@ -30,7 +30,7 @@ public class OrderCreationService {
     private final OutboxEventRepository outboxEventRepository;
     private final ObjectMapper objectMapper;
 
-    @Transactional
+    @Transactional(timeout = 30)
     public void createOrderAndEvent(
             UUID sagaId,
             PlaceOrderRequest request,
